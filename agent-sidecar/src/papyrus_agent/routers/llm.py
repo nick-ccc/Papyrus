@@ -1,5 +1,5 @@
 import base64
-from pathlib import Path
+import mimetypes
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -33,9 +33,9 @@ def extract_response(content: Any) -> str:
 
 
 @router.post("/vision", response_model=LLMResponse)
-async def test_vision(request: VisionRequest):
+async def test_vision(request: VisionRequest) -> LLMResponse:
     try:
-        image_content = []
+        image_blocks: list[str | dict[str, Any]] = []
 
         for image_path in request.image_paths:
             if not image_path.is_file():
@@ -44,30 +44,23 @@ async def test_vision(request: VisionRequest):
                     detail=f"Image not found: {image_path}",
                 )
 
-            image_content.append({
-                "type": "image",
-                "base64": image_path.read_bytes(),
-                "mime_type": "image/jpeg",
+            mime_type, _ = mimetypes.guess_type(image_path.name)
+            encoded = base64.b64encode(image_path.read_bytes()).decode("utf-8")
+
+            image_blocks.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{mime_type or 'image/jpeg'};base64,{encoded}"
+                },
             })
 
         message = HumanMessage(
             content=[
                 {"type": "text", "text": request.prompt},
-                *[
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": (
-                                f"data:image/jpeg;base64,"
-                                f"{base64.b64encode(item["base64"]).decode("utf-8")}"
-                            )
-                        },
-                    }
-                    for item in image_content
-                ],
+                *image_blocks,
             ]
         )
-        
+
         llm = get_vision_llm()
         result = await llm.ainvoke([message])
 
@@ -80,7 +73,7 @@ async def test_vision(request: VisionRequest):
 
 
 @router.post("/text", response_model=LLMResponse)
-async def test_text(request: DocumentRequest):
+async def test_text(request: DocumentRequest) -> LLMResponse:
     try:
         llm = get_document_llm()
         result = await llm.ainvoke(request.prompt)

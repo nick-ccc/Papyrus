@@ -10,7 +10,6 @@ from papyrus_agent.tools.structuring import (
     generate_latex_from_template,
 )
 
-
 class DocumentState(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -35,7 +34,7 @@ def route_input(state: DocumentState) -> str:
     raise ValueError("Document workflow requires image_paths or extracted_text.")
 
 
-def ocr_node(state: DocumentState) -> dict[str, OCRResult | str]:
+def ocr_node(state: DocumentState) -> dict[str, OCRResult | str | list[str]]:
     result: OCRResult = extract_text.invoke({
         "img_paths": state.image_paths,
     })
@@ -46,26 +45,32 @@ def ocr_node(state: DocumentState) -> dict[str, OCRResult | str]:
     return {
         "ocr_result": result,
         "extracted_text": result.full_text,
+        "warnings": [*state.warnings, *result.warnings],
     }
 
 def generate_latex_node(state: DocumentState) -> dict[str, LaTeXDocument | str | list[str]]: 
     if not state.extracted_text.strip():
         raise ValueError("No extracted document text provided.")
 
+    result: LaTeXDocument
+
     if state.template_id:
-        result: LaTeXDocument = generate_latex_from_template.invoke({
+        result = generate_latex_from_template.invoke({
             "extracted_text": state.extracted_text,
             "template_id": state.template_id,
         })
     else:
-        result: LaTeXDocument = generate_latex.invoke({
+        result = generate_latex.invoke({
             "extracted_text": state.extracted_text,
         })
+
+    if not result.latex_source.strip():
+        raise ValueError("LaTeX generation returned an empty document.")
 
     return {
         "latex_document": result,
         "latex_source": result.latex_source,
-        "warnings": result.warnings,
+        "warnings": [*state.warnings, *result.warnings],
     }
 
 

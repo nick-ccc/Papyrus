@@ -43,3 +43,8 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/papyrus_agent"]
+
+[tool.mypy]
+strict = true
+mypy_path = "src"
+packages = ["papyrus_agent"]

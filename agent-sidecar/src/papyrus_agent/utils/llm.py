@@ -1,3 +1,4 @@
+from pydantic import SecretStr
 from langchain_core.language_models import BaseChatModel
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
@@ -18,11 +19,7 @@ def get_vision_llm() -> BaseChatModel:
         return ChatOpenAI(
             model=settings.vision_model,
             base_url=settings.vision_base_url,
-            api_key=(
-                settings.vision_api_key.get_secret_value()
-                if settings.vision_api_key
-                else "not-needed"
-            ),
+            api_key=settings.vision_api_key or SecretStr("not-needed"),
         )
 
     raise ValueError(f"Unsupported vision provider: {provider}")
@@ -41,11 +38,7 @@ def get_document_llm() -> BaseChatModel:
         return ChatOpenAI(
             model=settings.document_model,
             base_url=settings.document_base_url,
-            api_key=(
-                settings.document_api_key.get_secret_value()
-                if settings.document_api_key
-                else "not-needed"
-            ),
+            api_key=settings.document_api_key or SecretStr("not-needed"),
         )
 
     raise ValueError(f"Unsupported document provider: {provider}")

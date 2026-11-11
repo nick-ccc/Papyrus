@@ -13,6 +13,12 @@ from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
 from papyrus_agent.utils.llm import get_vision_llm
+from papyrus_agent.utils.text import (
+    extract_json_object,
+    message_text,
+    strip_code_fences,
+    strip_reasoning,
+)
 
 
 class OCRPageResult(BaseModel):
@@ -45,8 +51,30 @@ Transcribe all visible content accurately.
 - Do not duplicate text across pages.
 - Estimate transcription confidence between 0.0 and 1.0.
 
-Return valid JSON matching the OCRPageResult schema.
+Respond with a single JSON object and nothing else (no Markdown fences,
+no commentary), with exactly these fields:
+{
+  "extracted_text": "<full transcription of the page>",
+  "confidence": <number between 0.0 and 1.0>,
+  "warnings": ["<short notes such as tables, equations, illegible regions>"]
+}
 """
+
+OCR_MAX_ATTEMPTS = 2
+
+
+class _OCRPageOutput(BaseModel):
+    """Page fields the vision model is asked to produce."""
+
+    extracted_text: str
+    confidence: float | None = Field(default=None, ge=0, le=1)
+    warnings: list[str] = Field(default_factory=list)
+
+
+def _parse_page_output(content: object) -> _OCRPageOutput:
+    text = strip_reasoning(message_text(content))
+    text = strip_code_fences(text)
+    return _OCRPageOutput.model_validate_json(extract_json_object(text))
 
 # TODO - currently unused
 # @tool
@@ -138,7 +166,7 @@ def extract_text(img_paths: list[str]) -> OCRResult:
                 path.read_bytes()
             ).decode("utf-8")
 
-            response = vision_llm.invoke([
+            messages = [
                 SystemMessage(content=OCR_SYSTEM_PROMPT),
                 HumanMessage(content=[
                     {
@@ -152,20 +180,40 @@ def extract_text(img_paths: list[str]) -> OCRResult:
                         },
                     },
                 ]),
-            ])
-            content = response.content
+            ]
 
-            if not isinstance(content, str):
-                raise ValueError("Vision LLM returned non-text content.")
+            output: _OCRPageOutput | None = None
+            last_error: Exception | None = None
 
-            page = OCRPageResult.model_validate_json(content)
-            page.page_number = page_number
-            pages.append(page)
+            for _ in range(OCR_MAX_ATTEMPTS):
+                response = vision_llm.invoke(messages)
+                try:
+                    output = _parse_page_output(response.content)
+                    break
+                except ValueError as parse_error:
+                    last_error = parse_error
+
+            if output is None:
+                raise ValueError(
+                    f"Vision LLM returned unparseable output: {last_error}"
+                )
+
+            pages.append(OCRPageResult(
+                page_number=page_number,
+                extracted_text=output.extracted_text,
+                confidence=output.confidence,
+                warnings=output.warnings,
+            ))
 
         except Exception as e:
             raise RuntimeError(
                 f"OCR failed on page {page_number} ({img_path}): {e}"
             ) from e
+
+    for page in pages:
+        document_warnings.extend(
+            f"Page {page.page_number}: {warning}" for warning in page.warnings
+        )
 
     full_text = "\n\n".join(
         f"--- Page {page.page_number} ---\n{page.extracted_text}"

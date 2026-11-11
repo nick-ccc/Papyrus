@@ -49,8 +49,14 @@ async def check_llm(
             error=str(exc),
         )
 
+@router.get("")
+async def liveness() -> dict[str, str]:
+    """Lightweight liveness check. Does not call any LLM."""
+    return {"status": "ok"}
+
+
 @router.get("/vision", response_model=LLMHealthResponse)
-async def vision_health():
+async def vision_health() -> LLMHealthResponse:
     result = await check_llm("vision", get_vision_llm)
 
     if result.status == HealthStatus.UNHEALTHY:
@@ -63,7 +69,7 @@ async def vision_health():
 
 
 @router.get("/document", response_model=LLMHealthResponse)
-async def document_health():
+async def document_health() -> LLMHealthResponse:
     result = await check_llm("document", get_document_llm)
 
     if result.status == HealthStatus.UNHEALTHY:
@@ -76,7 +82,7 @@ async def document_health():
 
 
 @router.get("/llm", response_model=SystemHealthResponse)
-async def llm_health():
+async def llm_health() -> SystemHealthResponse:
     vision, document = await asyncio.gather(
         check_llm("vision", get_vision_llm),
         check_llm("document", get_document_llm),
