@@ -22,3 +22,45 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Agent Sidecar
+# Python bytecode
+agent-sidecar/**/__pycache__/
+agent-sidecar/**/*.py[cod]
+
+# Virtual environments
+agent-sidecar/.venv/
+agent-sidecar/venv/
+agent-sidecar/env/
+
+# Python build artifacts
+agent-sidecar/build/
+agent-sidecar/dist/
+agent-sidecar/*.egg-info/
+agent-sidecar/**/*.egg-info/
+
+# Testing and tooling
+agent-sidecar/.pytest_cache/
+agent-sidecar/.mypy_cache/
+agent-sidecar/.ruff_cache/
+agent-sidecar/.pyright/
+agent-sidecar/.tox/
+agent-sidecar/.nox/
+agent-sidecar/.coverage
+agent-sidecar/htmlcov/
+
+# Jupyter
+agent-sidecar/.ipynb_checkpoints/
+
+# Environment and secrets
+agent-sidecar/.env
+agent-sidecar/.env.*
+!agent-sidecar/.env.example
+
+# Logs
+agent-sidecar/*.log
+agent-sidecar/logs/
+
+# OS files
+.DS_Store
+Thumbs.db
