@@ -33,8 +33,11 @@ def main() -> None:
         template_registry.directory, ", ".join(template_registry.ids()) or "none",
     )
 
+    # Import the app object (not an import string) so PyInstaller can trace it.
+    from papyrus_agent.api import app
+
     uvicorn.run(
-        "papyrus_agent.api:app",
+        app,
         host="127.0.0.1",
         port=8000,
         log_level="info",
